@@ -18,6 +18,8 @@ blog posts:
 * 可控的启发式扫描
 * 超强的性能, 最快的速度, 尽可能小的内存与CPU占用.
 * 最小发包原则, 尽可能少地发包获取最多的信息
+* 默认扫描/存活探测支持实时进度条, 长任务可见完成率、速率与耗时
+* 支持中断后保存进度快照, 使用 `--resume` 继续未完成的 default 扫描任务
 * 支持DSL, 可以通过修改的配置文件自定义自己的gogo
 * 完善的输出与输出设计
 * 几乎不依赖第三方库, 纯原生go编写, 在windows 2003上也可以使用完整的漏洞/指纹识别功能
@@ -33,6 +35,29 @@ blog posts:
 指定网段进行默认扫描, 并在命令行输出
 
 `gogo -i 192.168.1.1/24 -p win,db,top2 `
+
+### 任务进度与断点续扫
+
+默认情况下, `default` 与 `alive` 扫描会在终端显示进度条, 输出当前完成数、总任务数、耗时和速率. 如果只想保留扫描结果, 可使用 `--no-progress` 或 `-q`.
+
+```bash
+gogo -l ip.txt -p top2
+gogo -l ip.txt -p top2 --no-progress
+```
+
+长时间扫描过程中可以按 `Ctrl+C` 安全中断. 程序会在退出前写出一个 `*.progress.json` 快照文件, 后续可直接恢复未完成任务:
+
+```bash
+gogo -l ip.txt -p - -d 5 -t 100 -f result.dat
+
+# 中断后继续, 默认沿用原输出文件并追加写入
+gogo --resume result.dat.progress.json
+
+# 也可以切换到新的结果文件
+gogo --resume result.dat.progress.json -f resumed.dat
+```
+
+当前 `--resume` 主要面向 `default` 扫描路径, `smart/ss/sc` 等递归启发式模式暂不建议恢复使用.
 
 ### 端口配置
 
