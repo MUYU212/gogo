@@ -112,11 +112,12 @@ func isnotAlive(ip string, temp *sync.Map) bool {
 	return !ok
 }
 
-func NewTargetGenerator(config Config) *TargetGenerator {
+func NewTargetGenerator(config Config, progress *ProgressTracker) *TargetGenerator {
 	gen := TargetGenerator{
 		ipGenerator: NewIpGenerator(config),
 		spray:       config.PortSpray,
 		hostsMap:    config.HostsMap,
+		progress:    progress,
 	}
 	return &gen
 }
@@ -127,6 +128,7 @@ type TargetGenerator struct {
 	ch          chan targetConfig
 	hostsMap    map[string][]string
 	ipGenerator *IpGenerator
+	progress    *ProgressTracker
 }
 
 func (gen *TargetGenerator) genFromDefault(cidrs utils.CIDRs, portlist []string) {
@@ -135,6 +137,7 @@ func (gen *TargetGenerator) genFromDefault(cidrs utils.CIDRs, portlist []string)
 		ch := gen.ipGenerator.generatorDispatch(cidr, Default)
 		for ip := range ch {
 			for _, port := range portlist {
+				gen.progress.AddTotal(1)
 				gen.ch <- targetConfig{ip: ip, port: port, hosts: gen.hostsMap[ip]}
 				if engine.RunSum%65535 == 65534 {
 					Log.Importantf("Current processing %s:%s, number: %d", ip, port, engine.RunSum)
@@ -157,6 +160,7 @@ func (gen *TargetGenerator) genFromSpray(cidrs utils.CIDRs, portlist []string) {
 		for _, cidr := range cidrs {
 			ch := gen.ipGenerator.generatorDispatch(cidr, Default)
 			for ip := range ch {
+				gen.progress.AddTotal(1)
 				gen.ch <- targetConfig{ip: ip, port: port, hosts: gen.hostsMap[ip]}
 			}
 			syncFile()
@@ -177,6 +181,7 @@ func (gen *TargetGenerator) genFromSpray(cidrs utils.CIDRs, portlist []string) {
 
 func (gen *TargetGenerator) genFromResult(results parsers.GOGOResults) {
 	for _, result := range results {
+		gen.progress.AddTotal(1)
 		gen.ch <- targetConfig{ip: result.Ip, port: result.Port, fingers: result.Frameworks}
 	}
 }
@@ -207,6 +212,7 @@ func (gen *TargetGenerator) smartGenerator(cidr *utils.CIDR, portlist []string, 
 		ch := gen.ipGenerator.generatorDispatch(cidr, mod)
 		for ip := range ch {
 			for _, port := range portlist {
+				gen.progress.AddTotal(1)
 				gen.ch <- targetConfig{ip: ip, port: port}
 			}
 		}

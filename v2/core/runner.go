@@ -199,17 +199,19 @@ func (r *Runner) PrepareConfig() {
 			Opsec:        r.Opsec,
 			//SuffixStr:  r.SuffixStr,
 		},
-		IsListInput: r.IsListInput,
-		IsJsonInput: r.IsJsonInput,
-		PortProbe:   r.PortProbe,
-		IpProbe:     r.IpProbe,
-		NoSpray:     r.NoSpray,
-		Filename:    r.Filename,
-		FilePath:    r.FilePath,
-		Compress:    !r.Compress,
-		Tee:         r.Tee,
-		Filters:     r.Filters,
-		FilterOr:    r.FilterOr,
+		IsListInput:  r.IsListInput,
+		IsJsonInput:  r.IsJsonInput,
+		PortProbe:    r.PortProbe,
+		IpProbe:      r.IpProbe,
+		NoSpray:      r.NoSpray,
+		ResumeFile:   r.ResumeFile,
+		Filename:     r.Filename,
+		FilePath:     r.FilePath,
+		Compress:     !r.Compress,
+		Tee:          r.Tee,
+		ShowProgress: !r.NoProgress && !r.Quiet,
+		Filters:      r.Filters,
+		FilterOr:     r.FilterOr,
 	}
 
 	if r.FileOutputf == Default {
@@ -259,6 +261,10 @@ func (r *Runner) PrepareConfig() {
 
 func (r *Runner) Run() {
 	r.start = time.Now()
+	if r.ResumeFile != "" {
+		r.runWithCMD()
+		return
+	}
 	if r.WorkFlowName == "" && !r.IsWorkFlow {
 		r.runWithCMD()
 	} else {
@@ -286,6 +292,13 @@ func (r *Runner) Run() {
 
 func (r *Runner) runWithCMD() {
 	config := r.Config
+	var err error
+	if r.ResumeFile != "" {
+		config, err = buildResumeConfig(config)
+		if err != nil {
+			iutils.Fatal(err.Error())
+		}
+	}
 
 	if config.Filename != "" {
 		logs.Log.Warn("The result file has been specified, other files will not be created.")
@@ -309,7 +322,10 @@ func (r *Runner) runWithCMD() {
 	if err != nil {
 		iutils.Fatal(err.Error())
 	}
+	taskStarted := time.Now()
+	stopInterruptWatcher := startInterruptWatcher(preparedConfig, taskStarted)
 	RunTask(*preparedConfig) // 运行
+	stopInterruptWatcher()
 	r.Close(&config)
 }
 
@@ -356,7 +372,10 @@ func (r *Runner) runWithWorkFlow(workflowMap WorkflowMap) {
 			if err != nil {
 				iutils.Fatal(err.Error())
 			}
+			taskStarted := time.Now()
+			stopInterruptWatcher := startInterruptWatcher(preparedConfig, taskStarted)
 			RunTask(*preparedConfig) // 运行
+			stopInterruptWatcher()
 			r.Close(config)
 		}
 	} else {
@@ -396,6 +415,9 @@ func (r *Runner) Close(config *Config) {
 	}
 	if fileutils.IsExist(config.Filename + "_extract") {
 		logs.Log.Important("extractor result: " + config.Filename + "_extract")
+	}
+	if config.CheckpointName != "" && fileutils.IsExist(config.CheckpointName) {
+		_ = os.Remove(config.CheckpointName)
 	}
 }
 

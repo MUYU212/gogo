@@ -170,6 +170,12 @@ func Usage() string {
     stdin input:
       sometool | gogo -L -p http -q | exploit
 
+    resume interrupted task:
+      gogo --resume result.dat.progress.json
+
+    disable progress bar:
+      gogo -i 1.1.1.1/24 -p top2 --no-progress
+
     smart scan:
       gogo -i 192.168.1.1/16 -m s -p top2,win,db --af
 

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"strconv"
 	"strings"
 
 	. "github.com/chainreactors/gogo/v2/pkg"
@@ -65,6 +66,10 @@ func InitConfig(config *Config) (*Config, error) {
 		file = os.Stdin
 	}
 
+	err = prepareResumeTracking(config)
+	if err != nil {
+		return nil, err
+	}
 	// 初始化文件操作
 	err = config.InitFile()
 	if err != nil {
@@ -148,7 +153,12 @@ func printTaskInfo(config *Config, taskname string) {
 	// 输出任务的基本信息
 	logs.Log.Importantf("Current goroutines: %d, Version Level: %d,Exploit: %s, PortSpray: %t", config.Threads, config.RunnerOpt.VersionLevel, config.RunnerOpt.Exploit, config.PortSpray)
 	if config.Results == nil {
-		logs.Log.Importantf("Start task %s ,total ports: %d , mod: %s", taskname, len(config.PortList), config.Mod)
+		ports, probes := countPortsAndProbes(config.PortList)
+		if probes == 0 {
+			logs.Log.Importantf("Start task %s ,total ports: %d , mod: %s", taskname, ports, config.Mod)
+		} else {
+			logs.Log.Importantf("Start task %s ,total probes: %d (%d ports + %d extra probes) , mod: %s", taskname, len(config.PortList), ports, probes, config.Mod)
+		}
 		// 输出端口信息
 		if len(config.PortList) > 100 {
 			logs.Log.Important("too much ports , only show top 100 ports: " + strings.Join(config.PortList[:100], ",") + "......")
@@ -186,22 +196,47 @@ func RunTask(config Config) {
 }
 
 func guessTime(targets interface{}, portcount, thread int) int {
-	ipcount := 0
-
-	switch targets.(type) {
-	case utils.CIDRs:
-		for _, cidr := range targets.(utils.CIDRs) {
-			ipcount += cidr.Count()
-		}
-	case utils.CIDR:
-		ipcount += targets.(*utils.CIDR).Count()
-	case parsers.GOGOResults:
-		ipcount = len(targets.(parsers.GOGOResults))
+	ipcount := countTargets(targets)
+	if _, ok := targets.(parsers.GOGOResults); ok {
 		portcount = 1
-	default:
 	}
 
 	return (portcount*ipcount/thread)*4 + 4
+}
+
+func countTargets(targets interface{}) int {
+	ipcount := 0
+
+	switch v := targets.(type) {
+	case utils.CIDRs:
+		for _, cidr := range v {
+			ipcount += cidr.Count()
+		}
+	case *utils.CIDR:
+		ipcount += v.Count()
+	case parsers.GOGOResults:
+		ipcount = len(v)
+	}
+
+	return ipcount
+}
+
+func countScanTasks(targets interface{}, portcount int) int64 {
+	if _, ok := targets.(parsers.GOGOResults); ok {
+		return int64(countTargets(targets))
+	}
+	return int64(countTargets(targets) * portcount)
+}
+
+func countPortsAndProbes(portList []string) (ports int, probes int) {
+	for _, item := range portList {
+		if _, err := strconv.Atoi(item); err == nil {
+			ports++
+		} else {
+			probes++
+		}
+	}
+	return ports, probes
 }
 
 func guessSmartTime(cidr *utils.CIDR, config Config) int {

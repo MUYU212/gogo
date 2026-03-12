@@ -18,6 +18,7 @@ type InputOption struct {
 	IsListInput       bool   `short:"L" description:"Bool, same as -l, input from stdin"`
 	JsonFile          string `short:"j" long:"json" description:"File, previous results file e.g. -j 1.dat1 or list of colon-split ip:port, e.g. 123.123.123.123:123"`
 	IsJsonInput       bool   `short:"J" description:"Bool, same as -j, input from stdin"`
+	ResumeFile        string `long:"resume" description:"File, resume scan from a progress snapshot"`
 	FilterOr          bool   `long:"filter-or" description:"FilterOr"`
 	WorkFlowName      string `short:"w" long:"workflow" description:"String, workflow name('-P workflow' show all workflow)"`
 	IsWorkFlow        bool   `short:"W" description:"Bool, same as -w, input from stdin"`
@@ -35,6 +36,7 @@ type OutputOption struct {
 	Compress        bool   `short:"C" long:"compress" description:"Bool, close compress output file"`
 	Tee             bool   `long:"tee" description:"Bool, keep console output"`          // 是否开启命令行输出扫描结果
 	Quiet           bool   `short:"q" long:"quiet" description:"Bool, close log output"` // 是否开启命令行输出日志
+	NoProgress      bool   `long:"no-progress" description:"Bool, hide progress bar"`
 	NoGuess         bool   `long:"no-guess" description:"Bool, When formatting not output guess framework"`
 }
 

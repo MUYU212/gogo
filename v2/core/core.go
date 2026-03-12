@@ -47,13 +47,19 @@ func DefaultMod(targets interface{}, config Config) {
 	// 输出预估时间
 	logs.Log.Importantf("Default Scan is expected to take %d seconds", guessTime(targets, len(config.PortList), config.Threads))
 	var wgs sync.WaitGroup
-	targetGen := NewTargetGenerator(config)
+	progress := NewProgressTracker("default scan", config.ShowProgress)
+	progress.SetTotal(countScanTasks(targets, len(config.PortList)))
+	progress.SetDone(completedTasks(config, "default"))
+	defer progress.Finish()
+	targetGen := NewTargetGenerator(config, progress)
 	targetCh := targetGen.generatorDispatch(targets, config.PortList)
 	scanPool, _ := ants.NewPoolWithFunc(config.Threads, func(i interface{}) {
 		defer wgs.Done()
+		defer progress.AddDone(1)
 		tc := i.(targetConfig)
 		result := tc.NewResult()
 		engine.Dispatch(config.RunnerOpt, result)
+		markTaskCompleted(config, "default", tc)
 		if result.Open {
 			atomic.AddInt32(&Opt.AliveSum, 1)
 
@@ -85,9 +91,13 @@ func DefaultMod(targets interface{}, config Config) {
 	defer scanPool.Release()
 
 	for t := range targetCh {
+		if shouldSkipTask(config, "default", t) {
+			continue
+		}
 		wgs.Add(1)
 		_ = scanPool.Invoke(t)
 	}
+	progress.MarkGeneratedDone()
 
 	wgs.Wait()
 }
@@ -121,7 +131,9 @@ func SmartMod(target *utils.CIDR, config Config) {
 	var wg sync.WaitGroup
 
 	//var ipChannel chan string
-	targetGen := NewTargetGenerator(config)
+	progress := NewProgressTracker("smart scan "+target.String(), config.ShowProgress)
+	defer progress.Finish()
+	targetGen := NewTargetGenerator(config, progress)
 	temp := targetGen.ipGenerator.alivedMap
 
 	// 输出启发式扫描探针
@@ -134,6 +146,8 @@ func SmartMod(target *utils.CIDR, config Config) {
 	tcChannel := targetGen.smartGenerator(target, config.PortProbeList, config.Mod)
 
 	scanPool, _ := ants.NewPoolWithFunc(config.Threads, func(i interface{}) {
+		defer wg.Done()
+		defer progress.AddDone(1)
 		tc := i.(targetConfig)
 		result := NewResult(tc.ip, tc.port)
 		result.SmartProbe = true
@@ -145,13 +159,13 @@ func SmartMod(target *utils.CIDR, config Config) {
 		} else if result.Error != "" {
 			logs.Log.Debugf("%s stat: %s, errmsg: %s", result.GetTarget(), PortStat[result.ErrStat], result.Error)
 		}
-		wg.Done()
 	})
 	defer scanPool.Release()
 	for t := range tcChannel {
 		wg.Add(1)
 		_ = scanPool.Invoke(t)
 	}
+	progress.MarkGeneratedDone()
 	wg.Wait()
 
 	var iplist utils.CIDRs
@@ -193,19 +207,30 @@ func AliveMod(targets interface{}, config Config) {
 	var wgs sync.WaitGroup
 	logs.Log.Importantf("Alived spray task is expected to take %d seconds",
 		guessTime(targets, len(config.AliveSprayMod), config.Threads))
-	targetGen := NewTargetGenerator(config)
+	progress := NewProgressTracker("alive scan", config.ShowProgress)
+	progress.SetTotal(countScanTasks(targets, len(config.AliveSprayMod)))
+	progress.SetDone(completedTasks(config, "alive"))
+	defer progress.Finish()
+	targetGen := NewTargetGenerator(config, progress)
 	alivedmap := targetGen.ipGenerator.alivedMap
 	targetCh := targetGen.generatorDispatch(targets, config.AliveSprayMod)
 	scanPool, _ := ants.NewPoolWithFunc(config.Threads, func(i interface{}) {
-		aliveScan(config.RunnerOpt, i.(targetConfig), alivedmap)
-		wgs.Done()
+		defer wgs.Done()
+		defer progress.AddDone(1)
+		tc := i.(targetConfig)
+		aliveScan(config.RunnerOpt, tc, alivedmap)
+		markTaskCompleted(config, "alive", tc)
 	})
 	defer scanPool.Release()
 
 	for t := range targetCh {
+		if shouldSkipTask(config, "alive", t) {
+			continue
+		}
 		wgs.Add(1)
 		_ = scanPool.Invoke(t)
 	}
+	progress.MarkGeneratedDone()
 
 	wgs.Wait()
 

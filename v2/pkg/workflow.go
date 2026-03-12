@@ -54,14 +54,15 @@ func (w *Workflow) PrepareConfig(rconfig Config) *Config {
 			Ports:    w.Ports,
 			Mod:      w.Mod,
 		},
-		Excludes:    rconfig.Excludes,
-		IpProbe:     w.IpProbe,
-		PortProbe:   w.PortProbe,
-		FilePath:    w.Path,
-		Outputf:     "full",
-		FileOutputf: "json",
-		Tee:         rconfig.Tee,
-		Compress:    rconfig.Compress,
+		Excludes:     rconfig.Excludes,
+		IpProbe:      w.IpProbe,
+		PortProbe:    w.PortProbe,
+		FilePath:     w.Path,
+		Outputf:      "full",
+		FileOutputf:  "json",
+		Tee:          rconfig.Tee,
+		ShowProgress: rconfig.ShowProgress,
+		Compress:     rconfig.Compress,
 	}
 
 	if rconfig.FilePath != "" {

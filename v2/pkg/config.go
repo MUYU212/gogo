@@ -4,11 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
-	"os/signal"
 	"path"
 	"strings"
-	"syscall"
 
 	"github.com/chainreactors/utils/fileutils"
 
@@ -72,6 +69,7 @@ type Config struct {
 	IsJsonInput bool `json:"-"` // 从标准输入中读
 	NoSpray     bool `json:"-"`
 	Compress    bool `json:"-"`
+	IsResume    bool `json:"-"`
 
 	// output
 	FilePath       string              `json:"-"`
@@ -83,15 +81,21 @@ type Config struct {
 	SmartBFile     *fileutils.File     `json:"-"`
 	SmartCFile     *fileutils.File     `json:"-"`
 	AliveFile      *fileutils.File     `json:"-"`
+	CheckpointFile *fileutils.File     `json:"-"`
 	Tee            bool                `json:"-"`
+	ShowProgress   bool                `json:"-"`
 	Outputf        string              `json:"-"`
 	FileOutputf    string              `json:"-"`
 	Filenamef      string              `json:"-"`
+	ResumeFile     string              `json:"-"`
+	ProgressFile   string              `json:"-"`
+	CheckpointName string              `json:"-"`
 	Results        parsers.GOGOResults `json:"-"` // json反序列化后的,保存在内存中
 	HostsMap       map[string][]string `json:"-"` // host映射表
 	Filters        []string            `json:"-"`
 	FilterOr       bool                `json:"-"`
 	OutputFilters  [][]string          `json:"-"`
+	ResumeState    interface{}         `json:"-"`
 }
 
 func (config *Config) ToWorkflow() *Workflow {
@@ -247,23 +251,19 @@ func (config *Config) InitFile() error {
 			iutils.Fatal(err.Error())
 		}
 
-		go func() {
-			c := make(chan os.Signal, 2)
-			signal.Notify(c, os.Interrupt, syscall.SIGTERM)
-			go func() {
-				<-c
-				logs.Log.Debug("save and exit!")
-				config.File.Sync()
-				os.Exit(0)
-			}()
-		}()
-
-		if config.FileOutputf == "jl" || config.FileOutputf == "jsonlines" {
+		if !config.IsResume && (config.FileOutputf == "jl" || config.FileOutputf == "jsonlines") {
 			config.File.WriteLine(config.ToJson("scan"))
-		} else if config.FileOutputf == SUPERSMARTB {
+		} else if !config.IsResume && config.FileOutputf == SUPERSMARTB {
 			config.File.WriteLine(config.ToJson("smart"))
-		} else if config.FileOutputf == "csv" {
+		} else if !config.IsResume && config.FileOutputf == "csv" {
 			config.File.WriteString("ip,port,url,status,title,host,language,midware,frame,vuln,extract\n")
+		}
+	}
+
+	if config.CheckpointName != "" {
+		config.CheckpointFile, err = fileutils.NewFile(config.CheckpointName, fileutils.ModeAppend, false, false)
+		if err != nil {
+			return err
 		}
 	}
 
@@ -307,6 +307,9 @@ func (config *Config) Close() {
 	}
 	if config.AliveFile != nil {
 		config.AliveFile.Close()
+	}
+	if config.CheckpointFile != nil {
+		config.CheckpointFile.Close()
 	}
 }
 
