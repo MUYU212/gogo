@@ -58,24 +58,26 @@ jobs:
       - name: cat mod
         run: cat v2/go.mod
 
-      - name: Set up Go 1.11
+      - name: Set up Go 1.11 for legacy XP build
         uses: actions/setup-go@v3
         with:
           go-version: '1.11'
 
-      - name: Compile for Windows x64
+      - name: Compile legacy Windows XP x64 (best effort)
         run: go build -o dist/gogo_windowsxp_amd64.exe -ldflags "-s -w -X 'github.com/chainreactors/gogo/v2/internal/core.ver=${{ env.TAG }}'" -tags="forceposix" -asmflags "all=-trimpath=${{ env.GOPATH }}" -gcflags "all=-trimpath=${{ env.GOPATH }}" .
         env:
           GOOS: windows
           GOARCH: amd64
         working-directory: v2
+        continue-on-error: true
 
-      - name: Compile for Windows x86
+      - name: Compile legacy Windows XP x86 (best effort)
         run: go build -o dist/gogo_windowsxp_386.exe -ldflags "-s -w -X 'github.com/chainreactors/gogo/v2/internal/core.ver=${{ env.TAG }}'"  -tags="forceposix" -asmflags "all=-trimpath=${{ env.GOPATH }}" -gcflags "all=-trimpath=${{ env.GOPATH }}" .
         env:
           GOOS: windows
           GOARCH: '386'
         working-directory: v2
+        continue-on-error: true
 
       - name: Zip files
         run: zip -r v2/dist/gogo_archive.zip v2/dist/gogo* tools/* README.md

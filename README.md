@@ -22,7 +22,7 @@ blog posts:
 * 支持中断后保存进度快照, 使用 `--resume` 继续未完成的 default 扫描任务
 * 支持DSL, 可以通过修改的配置文件自定义自己的gogo
 * 完善的输出与输出设计
-* 几乎不依赖第三方库, 纯原生go编写, 在windows 2003上也可以使用完整的漏洞/指纹识别功能
+* 几乎不依赖第三方库, 纯原生go编写, 常规平台可稳定交叉编译; Windows XP/2003 兼容构建目前属于 legacy best-effort
  
 ## QuickStart
 
@@ -261,15 +261,13 @@ go generate
 # build 
 go build .
 
-# windows server 2003 compile
-GOOS=windows GOARCH=386 go1.10 build .
-
-# 因为go1.10 还没有go mod, 可能会导致依赖报错. 如果发生了依赖报错, 可以使用go1.11 编译. 
-# go1.11 官方声明不支持windows server 2003 , 实测可以稳定运行(需要调低并发).
+# legacy windows xp / server 2003 compile (best effort)
+# 现代依赖已经逐步要求 Go 1.16+, 因此这里不再保证每次 release 都能稳定通过。
 GOOS=windows GOARCH=386 go1.11 build .
 ```
 
-如果需要编译windows xp/2003的版本, 请先使用高版本的go生成templates. 再使用go 1.11编译即可.
+如果需要尝试编译 windows xp/2003 版本, 请先使用高版本的 Go 生成 templates, 再用 Go 1.11 尝试构建。
+需要注意, 由于当前部分依赖已要求 Go 1.16+, 该路径现在只保留为 legacy best-effort, 不再保证稳定成功。
 
 ## Similar or related works
 
